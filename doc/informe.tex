@@ -1,0 +1,218 @@
+%===================================================================================
+% JORNADA CIENTÍFICA ESTUDIANTIL - MATCOM, UH
+%===================================================================================
+% Esta plantilla ha sido diseñada para ser usada en los artículos de la
+% Jornada Científica Estudiantil, MatCom.
+%
+% Por favor, siga las instrucciones de esta plantilla y rellene en las secciones
+% correspondientes.
+%
+% NOTA: Necesitará el archivo 'jcematcom.sty' en la misma carpeta donde esté este
+%       archivo para poder utilizar esta plantila.
+%===================================================================================
+
+
+
+%===================================================================================
+% PREÁMBULO
+%-----------------------------------------------------------------------------------
+\documentclass[a4paper,10pt,twocolumn]{article}
+
+%===================================================================================
+% Paquetes
+%-----------------------------------------------------------------------------------
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{informe}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage[pdftex]{hyperref}
+%-----------------------------------------------------------------------------------
+% Configuración
+%-----------------------------------------------------------------------------------
+\hypersetup{colorlinks,%
+	    citecolor=black,%
+	    filecolor=black,%
+	    linkcolor=black,%
+	    urlcolor=blue}
+
+%===================================================================================
+
+
+
+%===================================================================================
+% Presentacion
+%-----------------------------------------------------------------------------------
+% Título
+%-----------------------------------------------------------------------------------
+\title{Informe del Proyecto Sea Channel. Simulación. Curso 2020-2021}
+
+%-----------------------------------------------------------------------------------
+% Autores
+%-----------------------------------------------------------------------------------
+\author{\\
+\name Leonel Alejandro Garc\'ia L\'opez\email \href{mailto:r.marti@estudiantes.matcom.uh.cu}{l.garcia3@estudiantes.matcom.uh.cu}
+	\\ \addr Grupo C412
+}
+
+%-----------------------------------------------------------------------------------
+% Tutores
+%-----------------------------------------------------------------------------------
+\tutors{\\
+Dr. Yudivián Almeida Cruz, \emph{Facultad de Matemática y Computación, Universidad de La Habana} \\
+Lic. Gabriela Rodriguez Santa Cruz Pacheco, \emph{Facultad de Matemática y Computación, Universidad de La Habana} \\
+Lic. Daniel Alejandro Valdés Pérez, \emph{Facultad de Matemática y Computación, Universidad de La Habana}}
+%-----------------------------------------------------------------------------------
+% Headings
+%-----------------------------------------------------------------------------------
+\jcematcomheading{\the\year}{1-\pageref{end}}{Leonel Alejandro Garc\'ia L\'opez}
+
+%-----------------------------------------------------------------------------------
+\ShortHeadings{Informe de Proyecto}{Leonel Alejandro Garc\'ia L\'opez}
+%===================================================================================
+
+
+
+%===================================================================================
+% DOCUMENTO
+%-----------------------------------------------------------------------------------
+\begin{document}
+
+%-----------------------------------------------------------------------------------
+% NO BORRAR ESTA LINEA!
+%-----------------------------------------------------------------------------------
+\twocolumn[
+%-----------------------------------------------------------------------------------
+
+\maketitle
+
+%===================================================================================
+% Resumen y Abstract
+%-----------------------------------------------------------------------------------
+\selectlanguage{spanish} % Para producir el documento en Español
+
+%-----------------------------------------------------------------------------------
+% Resumen en Español
+%-----------------------------------------------------------------------------------
+
+%-----------------------------------------------------------------------------------
+% English Abstract
+%-----------------------------------------------------------------------------------
+\vspace{0.5cm}
+
+%-----------------------------------------------------------------------------------
+% Palabras clave
+%-----------------------------------------------------------------------------------
+
+%-----------------------------------------------------------------------------------
+% Temas
+%-----------------------------------------------------------------------------------
+\begin{topics}
+	Simulación, Eventos Discretos
+\end{topics}
+
+
+%-----------------------------------------------------------------------------------
+% NO BORRAR ESTAS LINEAS!
+%-----------------------------------------------------------------------------------
+\vspace{0.8cm}
+]
+%-----------------------------------------------------------------------------------
+
+
+%===================================================================================
+
+%===================================================================================
+% Introducción
+%-----------------------------------------------------------------------------------
+\section{Introducción}
+%-----------------------------------------------------------------------------------
+  Como proyecto se propuso simular el funcionamiento de un canal mar\'itimo y a partir de este calcular un tiempo de espera estimado de los barcos, para lo cual asumimos como tiempo de espera para un barco en la cola de arribos a un dique como el tiempo que demora el dique en registrarlo para entrar (proceso de registro inmediatamente previo a la apertura de la reclusa de entrada al dique). Encontr\'e similitud con una arquitectura de 5 servidores conectados en serie, y a partir de ah\'i comenz\'o la implementaci\'on, donde los servidores ser\'ian diques y los clientes las naves.
+
+%===================================================================================
+
+\subsection{Modelado}
+
+ El modelo empleado en la simulación, posee las entidades b\'asicas `Ship` y `Dike`, que representan lo evidente pero solo funcionan como contenedores, u objetos de registro para almacenar informaci\'on de lo que representan pero no del tiempo de la simulaci\'on actual. Para manejar todo cronol\'ogicamente utilizando una cola con prioridad de `Event`s que facilitaba el acceso al pr\'oximo evento en tiempo logar\'itmico, los eventos muestro a continuaci\'on:
+ 
+ 
+ 
+ \textbf{Event} $\rightarrow$ Evento abstracto y general, que posee un $time$ y una $PRIORITY$ (prioridad sobre otros eventos si que ocurren simultaneamente).
+ 
+ \textbf{ShipArriveToChannel} $\rightarrow$ Evento que describe un arribo de nave al canal, contiene la propiedad $ship$ asociada a la misma.
+ 
+ \textbf{EnqueueToDike} $\rightarrow$ Evento que contiene una nave $ship$ y el $dike$ siguiente en el canal al que la nave espera para entrar.
+ 
+ 
+ \textbf{OpenDikeEntryGates} $\rightarrow$ Evento que describe el inicio de la apertura de las puertas de entrada al $dike$ y registra a los barcos que se encuentran en la cola de arribos y caben dentro del $dike$, para su posterior entrada (a partir de este punto las naves ya no est\'an esperando a ser atendidas ya est\'an en proceso de entrada).
+ 
+ \textbf{TransportShipsInsideDike} $\rightarrow$ Evento que describe el evento de entrada al $dike$ de las naves que fueron registradas previamente en el manejo del evento $OpenDikeEntryGates$ (secuencial, dependiente del tiempo de los arribos).
+ 
+ \textbf{TransportThroughDike} $\rightarrow$ Evento que da inicio a la fase de transporte dentro de un $dike$.
+ 
+ \textbf{ExitShipsFromDike} $\rightarrow$ Evento que da inicio a la fase de salida de un $dike$.
+
+ \textbf{ExitShipsFromChannel} $\rightarrow$ Evento que denota la salida de un grupo de naves $ships$ del Canal Mar\'itimo
+ 
+ Para el manejo de eventos se implement\'o el $SeaChannelEventsLoopHandler$ que contiene el estado actual del Canal en sus campos, y maneja el flujo de eventos as\'i como la creaci\'on de estos. Son almacenados en una cola con prioridad, donde a menor tiempo mejor posicionados est\'an para su extracci\'on y manejo (en caso de ocurrir simult\'aneos se consulta la prioridad del tipo de evento). En este controlador es donde se maneja el tiempo de la simulaci\'on, se lleva un registro de todos los barcos que culminaron la simulaci\'on, as\'i como de la cola de eventos y la lista de diques.
+ 
+ 
+  
+\subsection{Puntos Ambiguos y Convenios }
+
+  Para discretizar procesos de la vida real siempre se debe tener en cuenta que tan compleja debemos realizar la simulaci\'on, este problema no es un caso aislado, primero para esclarecer el tiempo de espera, solo tome en cuenta el desde el momento de llegada a la cola de arribos en cada dique hasta el registro en estos para su entrada. En la fase de salida tambi\'en hay un punto por aclarar, donde los barcos que est\'an en el interior del dique salen todos con un tiempo de salida igual, as\'i que el arribo al siguiente dique es simultaneo para estas naves. Por otro lado, la creaci\'on de algunos eventos como el $ShipArriveToChannel$ y $ExitShipsFromChannel$ aunque parezcan innecesarios son para mantener la l\'ogica y el flujo de eventos intuitivo, simple de entender y extender.
+
+%===================================================================================
+% Desarrollo
+%-----------------------------------------------------------------------------------
+\section{Simulación}
+%-----------------------------------------------------------------------------------
+  El flujo de la simulaci\'on es como sigue, primero se construyen unas tres listas de arribos para cada uno de los 3 tamaños (de barcos) definidos en el problema, luego se construye la cola de eventos inicial con los arribo de estas 3 listas. En este punto se inicia el ciclo principal, donde se manejan los eventos en orden cronol\'ogico, mientras la cola este por completo vac\'ia. 
+  Llegados a este punto es bastante simple inferir que se realiza para manejar cada evento y que eventos desencadena cada uno. En el caso del $ShipArriveToChannel$ solo encola un evento de tipo $EnqueueToDike$ referido a la nave en cuesti\'on y al primer dique. 
+  
+  El $EnqueueToDike$ como condici\'on evita que una vez alcanzado el tiempo final se permita el paso al primer dique, dado que solo esta permitida la salida del canal o procesos para esta, llegados a este tiempo. Este evento añade a la cola del dique siguiente el barco en cuesti\'on y encola un $OpenDikeEntryGates$ para abrir el dique en caso de que est\'e en desuso.
+  
+  El $OpenDikeEntryGates$ que llama a abrir las puertas en un tiempo determinado que distribuye exponencial($\lambda=4$minutos), registra las embarcaciones que caben dentro del dique antes de abrir las compuertas (una especie de reservaci\'on), donde se asigna el tiempo de espera para cada una de las naves, como la diferencia del tiempo de registrado actual (previo a la apertura de compuertas) y el arribo a la cola del dique. Finalmente lanza un evento para transportar los barcos al interior del dique el $TransportShipsInsideDike$.
+  
+  El $TransportShipsInsideDike$ un aviso de que hay barcos registrados para entrar a un dique determinado y estos van entrando de manera secuencial de acuerdo a la cola de arribos(mismo orden en que fueron registrados), donde cada barco demora posicion\'andose en el interior un tiempo que distribuye exponencial($\lambda=2$minutos) independiente de su tamaño, y se realiza un llamado a transportar el grupo de naves en el interior, dig\'amosle flota.
+  
+  El $TransportThroughDike$ es lanzado para transportar la flota en el interior a la segunda parte del dique, en un tiempo que distribuye exponencial($\lambda=7$minutos), a su vez encola un evento de tipo $ExitShipsFromDike$, con esta misma flota.
+  
+  El $ExitShipsFromDike$ es encolado para remover o definir el proceso de salida, que depende de la n\'umero de naves que componen la flota que se traslada en el interior, que distribuye exponencial($\lambda=3/2$minutos)por la cantidad de barcos que saldr\'an (no secuencial) donde todas las naves salen de este proceso con un tiempo de arribo al siguiente dique simultaneo llamando a $EnqueueToDike$ con cada uno de los barcos que salieron, en caso de ser el \'ultimo dique se realiza un aviso del tipo $ExitShipsFromChannel$, y luego se restaura el estado de dique anterior, haci\'endose un llamado a $OpenDikeEntryGates$ como señal de que se culmin\'o la tarea que manten\'ia el dique ocupado (en caso de que en su cola est\'en esperando por continuar).
+  
+  El $ExitShipsFromChannel$ por \'ultimo es lanzado para almacenar los barcos que salen del canal y sacar estad\'isticas de ellos al finalizar la simulaci\'on.
+	
+\subsection{Resultados Obtenidos}
+	Para un total de 250 barcos como m\'aximo, los resultados de \textit{tiempos de espera} para todos los barcos en total fueron de entre $[220, 398]$ minutos, para cada barco que entra al dique un m\'aximo de $1.7$ minutos y un m\'inimo de $0.50$ minutos aproximadamente, a continuaci\'on algunos ejemplos:
+	\\
+	
+	\begin{tabular}{ll}
+		Total    Ships: &247\\
+		Total  Awaited: &274.39267537714954\\
+		Median Awaited: &1.1109015197455447\\
+	\end{tabular}
+
+		-----------------------------------\\
+
+	\begin{tabular}{ll}
+		Total    Ships: &246\\
+		Total  Awaited: &319.00497020011363\\
+		Median Awaited: &1.2967681715451773\\
+	\end{tabular}
+
+		-----------------------------------\\
+		
+	\begin{tabular}{ll}
+		Total    Ships: &244\\
+		Total  Awaited: &321.1813121762692\\
+		Median Awaited: &1.3163168531814313\\
+	\end{tabular}
+
+		-----------------------------------\\
+	
+		
+
+\end{document}
+
+%===================================================================================
